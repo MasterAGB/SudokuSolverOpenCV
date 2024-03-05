@@ -233,4 +233,14 @@ public class NumberRecognizer : MonoBehaviour
     {
         public float[] Image; // This will need to be adapted based on how you choose to store image data
     }
+
+    public string DBInfo()
+    {
+        string info = "";
+        foreach (KeyValuePair<string,List<PatternVariant>> keyValuePair in db)
+        {
+            info += keyValuePair.Key + "=" + keyValuePair.Value.Count + "; ";
+        }
+        return info;
+    }
 }

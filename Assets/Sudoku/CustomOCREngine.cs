@@ -19,7 +19,6 @@ public class CustomOCREngine : MonoBehaviour
     public List<Button> numberButtons;
 
 
-    public ImageProcessing imageProcessing;
     public NumberRecognizer numberRecognizer;
     private Action<string> onNumberConfirmed;
 
@@ -108,7 +107,6 @@ public class CustomOCREngine : MonoBehaviour
 
         if (Cv2.CountNonZero(optimizedProcessedImage) < minPixelsForTrain)
         {
-            Debug.Log("Empty");
             onRecognized("");
             return;
         }

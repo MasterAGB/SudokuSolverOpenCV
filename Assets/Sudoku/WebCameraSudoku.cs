@@ -27,8 +27,16 @@ public class WebCameraSudoku : MonoBehaviour
     /// <summary>
     /// A kind of workaround for macOS issue: MacBook doesn't state it's webcam as frontal
     /// </summary>
-    protected bool forceFrontalCamera = false;
+    public bool forceFrontalCamera = false;
+    
+    public bool forcedFlipHorizontal = false;
+    public bool fixFisheye = false;
 
+    // Preset camera matrix and distortion coefficients
+// These values are just placeholders and should be replaced with actual calibration results for your camera
+    private Mat cameraMatrix = new Mat(3, 3, MatType.CV_64FC1, new double[] { 1000, 0, 320, 0, 1000, 240, 0, 0, 1 });
+    private Mat distCoeffs = new Mat(1, 5, MatType.CV_64FC1, new double[] { -0.1, 0.01, 0, 0, 0 });
+    
     /// <summary>
     /// WebCam texture parameters to compensate rotations, flips etc.
     /// </summary>
@@ -87,6 +95,8 @@ public class WebCameraSudoku : MonoBehaviour
 
         // frontal camera - we must flip around Y axis to make it mirror-like
         parameters.FlipHorizontally = forceFrontalCamera || webCamDevice.Value.isFrontFacing;
+        
+        parameters.FlipHorizontally  ^= forcedFlipHorizontal;
 
         // TODO:
         // actually, code below should work, however, on our devices tests every device except iPad
@@ -177,6 +187,16 @@ public class WebCameraSudoku : MonoBehaviour
     {
         webCamMat = OpenCvSharp.Unity.TextureToMat(input, TextureParameters);
 
+        
+        if (fixFisheye)
+        {
+            // Apply fisheye correction
+            Mat undistortedMat = new Mat();
+            Cv2.Undistort(webCamMat, undistortedMat, cameraMatrix, distCoeffs);
+            webCamMat = undistortedMat;
+        }
+
+        
         // processor.Image now holds data we'd like to visualize
         output = OpenCvSharp.Unity.MatToTexture(webCamMat,
             output); // if output is valid texture it's buffer will be re-used, otherwise it will be re-created
@@ -216,23 +236,18 @@ public class WebCameraSudoku : MonoBehaviour
         }
     }
 
-    public void ToggleCameraIndex()
+    public void UpdateCameraIndex()
     {
         if (WebCamTexture.devices.Length > 0)
         {
-            cameraIndex++;
             cameraIndex = cameraIndex % WebCamTexture.devices.Length;
-            Debug.Log("New camera index: "+cameraIndex);
+           
             
             if (cameraIndex < 0) cameraIndex = 0;
             if (cameraIndex >= WebCamTexture.devices.Length) cameraIndex = WebCamTexture.devices.Length - 1;
 
             DeviceName = WebCamTexture.devices[cameraIndex].name;
-
-            for (int i = 0; i < WebCamTexture.devices.Length; i++)
-            {
-                Debug.LogWarning("Found camera: " + i + ") " + WebCamTexture.devices[i].name);
-            }
+            Debug.Log("New camera index: "+cameraIndex+" - "+WebCamTexture.devices[cameraIndex].name);
         }
     }
 }

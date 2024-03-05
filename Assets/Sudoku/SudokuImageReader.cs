@@ -1,18 +1,22 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.IO;
 using UnityEngine;
 using System.Linq;
 using OpenCvSharp;
 using UnityEngine.UI;
+using Object = UnityEngine.Object;
 using Rect = OpenCvSharp.Rect; // Assuming you have OpenCV for Unity
+#if UNITY_EDITOR
+using UnityEditor; // Add this at the beginning of your script file
+#endif
 
 public class SudokuImageReader : MonoBehaviour
 {
     [Header("Components")] public WebCameraSudoku webCameraSudoku;
     public SudokuSolver sudokuSolver;
     public CustomOCREngine customOCREngine;
-    public ImageProcessing imageProcessing;
     public NumberRecognizer numberRecognizer;
 
 
@@ -28,43 +32,72 @@ public class SudokuImageReader : MonoBehaviour
     public RawImage finalRawImage;
     public Text outputText;
 
-    [Header("Blur Settings")]
-    [Range(0, 100)] public int blockSize = 41;
-    [Range(0, 100)] public double C = 20;
-    [Range(0, 100)] public int blurSize = 5;
-    [Range(0, 100)] public double sigmaX = 0;
-
     public int frameSkip = 3;
 
     [Header("Main Settings")] public bool solve = false;
     public bool useCamera = false;
     public bool RenderOneFrame = true;
     public bool RenderScreenInUpdate = false;
+    public bool recognizeEnabled = false;
 
+    [Header("Profiles for wrap and ocr")] public ImageProcessing wrapImageEffectProfile;
+    public ImageProcessing letterOCREffectProfile;
+
+
+    public void SaveFrame()
+    {
+        Mat mat = GetInputMat();
+        Texture2D resultTexture = OpenCvSharp.Unity.MatToTexture(mat);
+
+        // Convert Texture2D to PNG
+        byte[] bytes = resultTexture.EncodeToPNG();
+        Object.Destroy(resultTexture);
+
+        // Generate a filename based on date/time
+        string filename = System.DateTime.Now.ToString("yyyyMMdd_HHmmss") + ".png";
+
+#if UNITY_EDITOR
+        string path = Path.Combine(Application.dataPath, filename); // Save to Assets folder in Unity Editor
+#else
+        string path = Path.Combine(Application.persistentDataPath, filename); // Save to persistent data path on Android
+#endif
+
+        // Write file
+        File.WriteAllBytes(path, bytes);
+
+#if UNITY_EDITOR
+        Debug.Log("Saved frame to: " + path);
+#else
+        // Optionally, for Android, inform the user or handle the saved image further
+#endif
+
+// Inside your SaveFrame method, after saving the file
+#if UNITY_EDITOR
+        AssetDatabase.ImportAsset(Path.Combine("Assets", filename)); // Adjust path if needed
+        AssetDatabase.Refresh(); // Refresh the Asset Database to show the new file
+#endif
+    }
 
     public void ToggleAccuracy()
     {
-        if (numberRecognizer.RecognizeThreshold < 0.8f)
+        if (numberRecognizer.RecognizeThreshold < 0.85f)
         {
             numberRecognizer.RecognizeThreshold = 0.9f;
             numberRecognizer.VariantThreshold = 0.9f;
         }
         else
         {
-            numberRecognizer.RecognizeThreshold = 0.4f;
-            numberRecognizer.VariantThreshold = 0.4f;
+            numberRecognizer.RecognizeThreshold = 0.8f;
+            numberRecognizer.VariantThreshold = 0.8f;
         }
     }
 
-    public void ToggleCameraOrSample()
+
+    public void ToggleRecognize()
     {
-        useCamera = !useCamera;
+        recognizeEnabled = !recognizeEnabled;
     }
 
-    public void ToggleCameraIndex()
-    {
-        webCameraSudoku.ToggleCameraIndex();
-    }
 
     public void ToggleSolve()
     {
@@ -79,7 +112,7 @@ public class SudokuImageReader : MonoBehaviour
             //Setting high accuracy
             numberRecognizer.RecognizeThreshold = 0.9f;
             numberRecognizer.VariantThreshold = 0.9f;
-            
+
             RenderScreenInUpdate = false;
             RenderOneFrame = true;
         }
@@ -144,17 +177,6 @@ public class SudokuImageReader : MonoBehaviour
     }
 
 
-    public Mat PreprocessImageForWrap(Mat originalImage)
-    {
-        if (blurSize % 2 == 0) blurSize++;
-        if (blockSize % 2 == 0) blockSize++;
-        Mat gray = imageProcessing.ConvertToGrayscale(originalImage);
-        Mat blur = imageProcessing.ApplyGaussianBlur(gray, blurSize, blurSize, sigmaX);
-        Mat adaptiveThresh = imageProcessing.ApplyAdaptiveThreshold(blur, 255, ImageProcessing.AdaptiveMethod.Gaussian,
-            ImageProcessing.ThresholdType.BinaryInv, blockSize, C);
-        return adaptiveThresh;
-    }
-
     private void PrintDigits(int[,] digits)
     {
         string digitsOutput = "";
@@ -178,7 +200,9 @@ public class SudokuImageReader : MonoBehaviour
         return Math.Sqrt(Math.Pow(point2.X - point1.X, 2) + Math.Pow(point2.Y - point1.Y, 2));
     }
 
-    public (Mat,Mat, Mat) FourPointTransform(Mat imageProcessed, Mat imageOriginal, Point2f[] pts)
+    private Size warpedOriginalSize;
+
+    public (Mat, Mat, Mat) FourPointTransform(Mat imageProcessed, Mat imageOriginal, Point2f[] pts)
     {
         Point2f[] rect = OrderPoints(pts).Select(v => new Point2f(v.X, v.Y)).ToArray();
 
@@ -204,11 +228,19 @@ public class SudokuImageReader : MonoBehaviour
         Mat originalImageWarped = new Mat();
         Cv2.WarpPerspective(imageOriginal, originalImageWarped, M, new Size(maxWidth, maxHeight));
 
-        return (warped,originalImageWarped, M);
+
+        warpedOriginalSize = warped.Size();
+        //Resizing to keep it consistent
+        Cv2.Resize(warped, warped, imageProcessed.Size());
+        Cv2.Resize(originalImageWarped, originalImageWarped, imageProcessed.Size());
+
+
+        return (warped, originalImageWarped, M);
     }
 
 
-    public (Mat warped, Mat warpedOriginal, Point2f[] approx, Mat M) FindSudokuGrid(Mat preprocessedImage, Mat originalImage)
+    public (Mat warped, Mat warpedOriginal, Point2f[] approx, Mat M) FindSudokuGrid(Mat preprocessedImage,
+        Mat originalImage)
     {
         HierarchyIndex[] hierarchy;
         Point[][] contours;
@@ -237,7 +269,8 @@ public class SudokuImageReader : MonoBehaviour
             {
                 // Convert points to OpenCV Point2f
                 Point2f[] srcPoints = approxPoints.Select(p => new Point2f(p.X, p.Y)).ToArray();
-                (Mat warped,Mat originalImageWarped, Mat M_orig) = FourPointTransform(preprocessedImage, originalImage,srcPoints);
+                (Mat warped, Mat originalImageWarped, Mat M_orig) =
+                    FourPointTransform(preprocessedImage, originalImage, srcPoints);
 
                 return (warped, originalImageWarped, srcPoints, M_orig); // Here, srcPoints is already Point2f[]
             }
@@ -247,8 +280,15 @@ public class SudokuImageReader : MonoBehaviour
     }
 
 
-    public IEnumerator ExtractAndRecognizeCellsAsync(Mat originalImage, Mat gridImage, Action<int[,]> onCompletion)
+    public IEnumerator ExtractAndRecognizeCellsAsync(Mat originalImage, Mat gridImage, Mat letterImage,
+        Action<int[,]> onCompletion)
     {
+        if (!recognizeEnabled)
+        {
+            onCompletion?.Invoke(new int[9, 9]);
+            yield break;
+        }
+
         int[,] cells = new int[9, 9]; // Initialize the Sudoku grid as a 9x9 matrix of zeros
 
         int cellHeight = gridImage.Height / 9;
@@ -262,14 +302,15 @@ public class SudokuImageReader : MonoBehaviour
                 Rect cellRect = new Rect(col * cellWidth, row * cellHeight, cellWidth, cellHeight);
                 Mat cellOrig = new Mat(originalImage, cellRect);
                 Mat cellWrap = new Mat(gridImage, cellRect);
-                Mat cellProcessed = imageProcessing.PreprocessCellForOCR(cellOrig);
+                Mat cellProcessed = new Mat(letterImage, cellRect);
+                Mat cellCompleted = letterOCREffectProfile.CropAndResizeImage(cellProcessed);
 
 
                 bool firstLetterProcessed = false;
 
 
                 // Assuming RecognizeAsync is an adjusted version of Recognize that works with coroutines
-                yield return StartCoroutine(customOCREngine.RecognizeAsync(cellOrig,cellWrap, cellProcessed,
+                yield return StartCoroutine(customOCREngine.RecognizeAsync(cellOrig, cellProcessed, cellCompleted,
                     (digitText) =>
                     {
                         ProcessOCRResult(digitText, row, col, cells);
@@ -277,8 +318,8 @@ public class SudokuImageReader : MonoBehaviour
                         {
                             firstLetterProcessed = true;
                             DisplayResultTexture(cellOrig, "Letter sample", letterRawImage, false);
-                            DisplayResultTexture(cellWrap, "Letter sample", letterWrapRawImage, false);
-                            DisplayResultTexture(cellProcessed, "Trimmed letter sample", trimmedLetterRawImage, false);
+                            DisplayResultTexture(cellProcessed, "Letter sample", letterWrapRawImage, false);
+                            DisplayResultTexture(cellCompleted, "Trimmed letter sample", trimmedLetterRawImage, false);
                         }
                     }));
 
@@ -292,8 +333,14 @@ public class SudokuImageReader : MonoBehaviour
     }
 
 
-    public void ExtractAndRecognizeCells(Mat originalImage, Mat gridImage, Action<int[,]> onCompletion)
+    public void ExtractAndRecognizeCells(Mat originalImage, Mat gridImage, Mat letterImage, Action<int[,]> onCompletion)
     {
+        if (!recognizeEnabled)
+        {
+            onCompletion?.Invoke(new int[9, 9]);
+            return;
+        }
+
         int[,] cells = new int[9, 9]; // Initialize the Sudoku grid as a 9x9 matrix of zeros
 
         int cellHeight = gridImage.Height / 9;
@@ -307,19 +354,20 @@ public class SudokuImageReader : MonoBehaviour
                 Rect cellRect = new Rect(col * cellWidth, row * cellHeight, cellWidth, cellHeight);
                 Mat cellOrig = new Mat(originalImage, cellRect);
                 Mat cellWrap = new Mat(gridImage, cellRect);
-                Mat cellProcessed = imageProcessing.PreprocessCellForOCR(cellOrig);
+                Mat cellProcessed = new Mat(letterImage, cellRect);
+                Mat cellCompleted = letterOCREffectProfile.CropAndResizeImage(cellProcessed);
 
                 bool firstLetterProcessed = false;
 
-                customOCREngine.Recognize(cellOrig, cellWrap, cellProcessed, (digitText) =>
+                customOCREngine.Recognize(cellOrig, cellProcessed, cellCompleted, (digitText) =>
                 {
                     ProcessOCRResult(digitText, row, col, cells);
                     if (!firstLetterProcessed)
                     {
                         firstLetterProcessed = true;
                         DisplayResultTexture(cellOrig, "Letter sample", letterRawImage, false);
-                        DisplayResultTexture(cellWrap, "Letter sample", letterWrapRawImage, false);
-                        DisplayResultTexture(cellProcessed, "Trimmed letter sample", trimmedLetterRawImage, false);
+                        DisplayResultTexture(cellProcessed, "Letter sample", letterWrapRawImage, false);
+                        DisplayResultTexture(cellCompleted, "Trimmed letter sample", trimmedLetterRawImage, false);
                     }
                 });
             }
@@ -345,49 +393,83 @@ public class SudokuImageReader : MonoBehaviour
         }
     }
 
+    public bool drawRects = false;
 
     public Mat AnnotateSolution(Mat originalImage, int[,] solution, List<Point2f[]> cellPositions, Scalar color,
         Mat MInv)
     {
+        Scalar veryLightColor = new Scalar(255, 255, 255); // Light gray for the checkerboard
+        Scalar lightColor = new Scalar(245, 245, 245); // Light gray for the checkerboard
+
+        Scalar darkColor = new Scalar(215, 215, 215); // Dark gray for the checkerboard
+        Scalar veryDarkColor = new Scalar(205, 205, 205); // Dark gray for the checkerboard
+
+        Scalar numberColor = color; // Black color for the numbers
+        int numberThickness = 2; // Thickness for the numbers
+
+        // Iterate over the entire grid
         for (int row = 0; row < 9; row++)
         {
             for (int col = 0; col < 9; col++)
             {
-                int digit = solution[row, col];
+                Point2f[] cellCorners = cellPositions[row * 9 + col];
+                Point2f[] dstCorners = Cv2.PerspectiveTransform(cellCorners, MInv).ToArray();
 
 
-                if (digit > 0) // If the cell is not empty
+                if (drawRects)
                 {
-                    // Calculate cell center based on its corners
-                    Point2f[] cellCorners = cellPositions[row * 9 + col];
-                    double averageX = cellCorners.Average(corner => corner.X);
-                    double averageY = cellCorners.Average(corner => corner.Y);
-                    Point2f cellCenter = new Point2f(
-                        (float)averageX,
-                        (float)averageY);
+                    // Determine the color based on the checkerboard pattern for both individual cells and 3x3 blocks
+                    bool isDarkBlock = ((row / 3) % 2 == (col / 3) % 2);
+                    bool isDarkCell = (row % 2 == col % 2);
 
-                    // Use the smaller dimension to ensure the text fits within the cell
-                    double cellWidth = CalculateDistance(cellCorners[1], cellCorners[0]);
-                    double cellHeight = CalculateDistance(cellCorners[3], cellCorners[0]);
-                    double cellSize = Mathf.Min((float)cellWidth, (float)cellHeight);
+                    Scalar cellColor = isDarkCell ? lightColor : veryLightColor;
+                    if (isDarkBlock)
+                    {
+                        cellColor = isDarkCell ? darkColor : veryDarkColor;
+                    }
 
-                    // Dynamically adjust font scale and thickness based on cell size
-                    double fontScale = cellSize / 40;
-                    int thickness = Mathf.Max(2, (int)(cellSize / 20));
+                    // Draw filled rectangle for the checkerboard pattern
+                    Cv2.FillConvexPoly(originalImage, dstCorners.Select(p => new Point(p.X, p.Y)).ToArray(), cellColor);
+                }
 
-                    // Transform the center point back to the original image's coordinate system
-                    Point2f[] srcPoint = { cellCenter };
-                    Point2f[] dstPoint = Cv2.PerspectiveTransform(srcPoint, MInv);
 
-                    // Draw the digit on the original image
-                    Cv2.PutText(originalImage, digit.ToString(), dstPoint[0], HersheyFonts.HersheySimplex, fontScale,
-                        color, thickness);
+                int digit = solution[row, col];
+                if (digit > 0) // If the cell is not empty, draw the number
+                {
+                    // Calculate the cell center
+                    Point cellCenter = new Point((int)dstCorners.Average(corner => corner.X),
+                        (int)dstCorners.Average(corner => corner.Y));
+
+                    // Draw the digit in the center of the cell
+                    string text = digit.ToString();
+                    var fontFace = HersheyFonts.HersheySimplex;
+                    double fontScale = CalculateOptimalFontScale(text, dstCorners);
+                    Size textSize = Cv2.GetTextSize(text, fontFace, fontScale, numberThickness, out int baseLine);
+                    Point textOrg = new Point(cellCenter.X - textSize.Width / 2, cellCenter.Y + textSize.Height / 2);
+
+                    Cv2.PutText(originalImage, text, textOrg, fontFace, fontScale, numberColor, numberThickness);
                 }
             }
         }
 
         return originalImage;
     }
+
+// Helper method to calculate an optimal font scale so that the text fits well within the cell
+    private double CalculateOptimalFontScale(string text, Point2f[] cellCorners)
+    {
+        double cellWidth = CalculateDistance(cellCorners[0], cellCorners[1]);
+        double maxWidth = cellWidth * 0.8; // Allow text width to be at most 80% of cell width
+
+        int baseThickness = 2;
+        var baseFontFace = HersheyFonts.HersheySimplex;
+        double baseScale = 1.0;
+        Size textSize = Cv2.GetTextSize(text, baseFontFace, baseScale, baseThickness, out int baseLine);
+
+        double scale = maxWidth / textSize.Width;
+        return Math.Min(scale, 1.0); // Ensure the scale does not exceed 1.0 for consistency
+    }
+
 
     public Point2f[] OrderPoints(Point2f[] pts)
     {
@@ -409,14 +491,11 @@ public class SudokuImageReader : MonoBehaviour
         return rect;
     }
 
-    public List<Point2f[]> CalculateCellPositions(Mat originalImage, Point2f[] gridCorners)
+    public List<Point2f[]> CalculateCellPositions()
     {
-        // First, correct the perspective distortion
-        var (correctedImage,correctedOriginalImage, M) = FourPointTransform(originalImage, originalImage, gridCorners);
-
         List<Point2f[]> cellPositions = new List<Point2f[]>();
-        int cellSizeCol = correctedImage.Width / 9;
-        int cellSizeRow = correctedImage.Height / 9;
+        int cellSizeCol = warpedOriginalSize.Width / 9;
+        int cellSizeRow = warpedOriginalSize.Height / 9;
 
         for (int row = 0; row < 9; row++)
         {
@@ -446,19 +525,21 @@ public class SudokuImageReader : MonoBehaviour
     {
         Mat originalImage = GetInputMat();
 
+
         DisplayResultTexture(originalImage, "OriginalImage", originalRawImage, false);
 
-        
-        Mat processedImage = PreprocessImageForWrap(originalImage);
 
-        (Mat warpedGrid, Mat originalImageWarped, Point2f[] gridCorners, Mat M) = FindSudokuGrid(processedImage, originalImage);
+        Mat processedImage = wrapImageEffectProfile.PreprocessImage(originalImage);
+
+        (Mat warpedGrid, Mat originalImageWarped, Point2f[] gridCorners, Mat M) =
+            FindSudokuGrid(processedImage, originalImage);
         if (warpedGrid == null)
         {
             Debug.Log("Sudoku grid not found :(.");
             DisplayResultTexture(processedImage, "nonwarpedGrid", nonWrappedRawImage, false);
             DisplayResultTexture(warpedGrid, "warpedGrid", wrappedRawImage, false);
             DisplayResultTexture(originalImageWarped, "warpedGrid", wrappedOriginalRawImage, false);
-            DisplayResultTexture((Texture2D)null, "warpedGrid", letterPreviewRawImage, false);
+            DisplayResultTexture((Mat)null, "warpedGrid", letterPreviewRawImage, false);
             return (originalImage, null, null, null, null, null);
         }
 
@@ -470,15 +551,15 @@ public class SudokuImageReader : MonoBehaviour
         DisplayResultTexture(AddGridCorners(processedImage, gridCorners), "nonWarpedGrid", nonWrappedRawImage, false);
         DisplayResultTexture(warpedGrid, "warpedGrid", wrappedRawImage, false);
         DisplayResultTexture(originalImageWarped, "warpedGrid", wrappedOriginalRawImage, false);
-        DisplayResultTexture(imageProcessing.PreprocessCellForOCR(originalImageWarped,false), "letterPreviewRawImage", letterPreviewRawImage, false);
-        
-        
+        DisplayResultTexture(letterOCREffectProfile.PreprocessImage(originalImageWarped),
+            "letterPreviewRawImage", letterPreviewRawImage, false);
+
+
         Mat MInv = new Mat();
         Cv2.Invert(M, MInv, DecompTypes.LU);
 
 
-        List<Point2f[]> cellPositions = CalculateCellPositions(originalImage, gridCorners);
-        //Debug.Log("Grid and cell positions calculated.");
+        List<Point2f[]> cellPositions = CalculateCellPositions();
 
         originalImage = AddGridCorners(originalImage, gridCorners);
 
@@ -522,41 +603,44 @@ public class SudokuImageReader : MonoBehaviour
 
     private void ProcessSudokuImageUpdate()
     {
-        (Mat originalImage,Mat originalImageWarped, Mat warpedGrid, Point2f[] gridCorners, List<Point2f[]> cellPositions, Mat MInv) =
+        (Mat originalImage, Mat originalImageWarped, Mat warpedGrid, Point2f[] gridCorners,
+                List<Point2f[]> cellPositions, Mat MInv) =
             PrepareWarpedGrid();
+
 
         if (warpedGrid != null)
         {
-            ExtractAndRecognizeCells(originalImageWarped, warpedGrid, recognizedDigits =>
-            {
-                //Debug.Log("Recognized digits from the sudoku grid.");
-
-                recognizedDigits = OptimizeRecognizedDigits(recognizedDigits);
-                //Debug.Log("Optimized recognized digits.");
-
-                Mat annotatedImage = AnnotateSolution(originalImage, recognizedDigits, cellPositions,
-                    new Scalar(255, 0, 255), MInv);
-
-
-                if (solve)
+            ExtractAndRecognizeCells(originalImageWarped, warpedGrid,
+                letterOCREffectProfile.PreprocessImage(originalImageWarped), recognizedDigits =>
                 {
-                    DisplayResultTexture(annotatedImage, "Annotated texture", annotatedRawImage, false);
-                    // Assuming SolveSudoku and a second call to AnnotateSolution are implemented similarly
-                    int[,] solution = sudokuSolver.SolveSudoku(recognizedDigits);
-                    int[,] onlyNewDigits = sudokuSolver.GetOnlyNewDigits(recognizedDigits, solution);
+                    //Debug.Log("Recognized digits from the sudoku grid.");
 
-                    annotatedImage =
-                        AnnotateSolution(originalImage, onlyNewDigits, cellPositions, new Scalar(255, 0, 0), MInv);
+                    recognizedDigits = OptimizeRecognizedDigits(recognizedDigits);
+                    //Debug.Log("Optimized recognized digits.");
+
+                    Mat annotatedImage = AnnotateSolution(originalImage, recognizedDigits, cellPositions,
+                        new Scalar(0, 0, 0), MInv);
 
 
-                    DisplayResultTexture(annotatedImage, "Result texture", finalRawImage, false);
-                }
-                else
-                {
-                    DisplayResultTexture(annotatedImage, "Annotated texture", annotatedRawImage, false);
-                    DisplayResultTexture(annotatedImage, "Result texture", finalRawImage, false);
-                }
-            });
+                    if (solve)
+                    {
+                        DisplayResultTexture(annotatedImage, "Annotated texture", annotatedRawImage, false);
+                        // Assuming SolveSudoku and a second call to AnnotateSolution are implemented similarly
+                        int[,] solution = sudokuSolver.SolveSudoku(recognizedDigits);
+                        int[,] onlyNewDigits = sudokuSolver.GetOnlyNewDigits(recognizedDigits, solution);
+
+                        annotatedImage =
+                            AnnotateSolution(originalImage, onlyNewDigits, cellPositions, new Scalar(0, 128, 0), MInv);
+
+
+                        DisplayResultTexture(annotatedImage, "Result texture", finalRawImage, false);
+                    }
+                    else
+                    {
+                        DisplayResultTexture(annotatedImage, "Annotated texture", annotatedRawImage, false);
+                        DisplayResultTexture(annotatedImage, "Result texture", finalRawImage, false);
+                    }
+                });
         }
         else
         {
@@ -567,7 +651,8 @@ public class SudokuImageReader : MonoBehaviour
 
     private IEnumerator ProcessSudokuImage()
     {
-        (Mat originalImage, Mat originalImageWarped, Mat warpedGrid, Point2f[] gridCorners, List<Point2f[]> cellPositions, Mat MInv) =
+        (Mat originalImage, Mat originalImageWarped, Mat warpedGrid, Point2f[] gridCorners,
+                List<Point2f[]> cellPositions, Mat MInv) =
             PrepareWarpedGrid();
 
 
@@ -578,27 +663,28 @@ public class SudokuImageReader : MonoBehaviour
 
 
         // Wait for ExtractAndRecognizeCells to complete
-        yield return StartCoroutine(ExtractAndRecognizeCellsAsync(originalImageWarped, warpedGrid, recognizedDigits =>
-        {
-            Debug.Log("Recognized digits from the sudoku grid.");
+        yield return StartCoroutine(ExtractAndRecognizeCellsAsync(originalImageWarped, warpedGrid,
+            letterOCREffectProfile.PreprocessImage(originalImageWarped), recognizedDigits =>
+            {
+                Debug.Log("Recognized digits from the sudoku grid.");
 
-            recognizedDigits = OptimizeRecognizedDigits(recognizedDigits);
-            Debug.Log("Optimized recognized digits.");
+                recognizedDigits = OptimizeRecognizedDigits(recognizedDigits);
+                Debug.Log("Optimized recognized digits.");
 
-            Mat annotatedImage = AnnotateSolution(originalImage, recognizedDigits, cellPositions,
-                new Scalar(255, 0, 255), MInv);
-            DisplayResultTexture(annotatedImage, "Annotated texture", annotatedRawImage, false);
+                Mat annotatedImage = AnnotateSolution(originalImage, recognizedDigits, cellPositions,
+                    new Scalar(255, 0, 255), MInv);
+                DisplayResultTexture(annotatedImage, "Annotated texture", annotatedRawImage, false);
 
-            // Assuming SolveSudoku and a second call to AnnotateSolution are implemented similarly
-            int[,] solution = sudokuSolver.SolveSudoku(recognizedDigits);
-            int[,] onlyNewDigits = sudokuSolver.GetOnlyNewDigits(recognizedDigits, solution);
+                // Assuming SolveSudoku and a second call to AnnotateSolution are implemented similarly
+                int[,] solution = sudokuSolver.SolveSudoku(recognizedDigits);
+                int[,] onlyNewDigits = sudokuSolver.GetOnlyNewDigits(recognizedDigits, solution);
 
-            annotatedImage =
-                AnnotateSolution(originalImage, recognizedDigits, cellPositions, new Scalar(0, 0, 255), MInv);
+                annotatedImage =
+                    AnnotateSolution(originalImage, recognizedDigits, cellPositions, new Scalar(0, 0, 255), MInv);
 
 
-            DisplayResultTexture(annotatedImage, "Result texture", finalRawImage, false);
-        }));
+                DisplayResultTexture(annotatedImage, "Result texture", finalRawImage, false);
+            }));
     }
 
     private Mat GetInputMat()
@@ -631,51 +717,47 @@ public class SudokuImageReader : MonoBehaviour
         cam.targetTexture = null; // Reset the camera's target texture
         RenderTexture.active = null; // Reset the active RenderTexture
         Destroy(renderTexture); // We're done with the RenderTexture, destroy it
-
         Mat originalImage = OpenCvSharp.Unity.TextureToMat(texture); // Convert Texture2D to Mat
-
+        Destroy(texture); // We're done with the texture, destroy it
         return originalImage; // Return the Texture2D
     }
 
 
-    public static void DisplayResultTexture(Mat mat, string nameOfTexture, RawImage rawImage = null, bool resize = true)
-    {
-        if (mat != null)
-        {
-            Texture2D resultTexture =
-                OpenCvSharp.Unity.MatToTexture(mat); // Implement conversion based on your setup
-            DisplayResultTexture(resultTexture, nameOfTexture, rawImage, resize);
-        }
-        else
-        {
-            DisplayResultTexture((Texture2D)null, nameOfTexture, rawImage, resize);
-        }
-    }
+    public static Canvas canvas;
 
-    public static void DisplayResultTexture(Texture2D texture, string nameOfTexture, RawImage rawImage = null,
-        bool resize = true)
+    public static void DisplayResultTexture(Mat mat, string nameOfTexture, RawImage rawImage = null, bool resize = true)
     {
         //Debug.Log("Showing image: " + nameOfTexture);
 
         if (rawImage == null)
         {
             GameObject resultTexture = new GameObject(nameOfTexture);
-            Transform parent = FindAnyObjectByType<Canvas>().transform;
+            if (canvas == null)
+            {
+                canvas = FindAnyObjectByType<Canvas>();
+            }
+
+            Transform parent = canvas.transform;
             resultTexture.transform.SetParent(parent);
             rawImage = resultTexture.AddComponent<RawImage>();
         }
 
         if (rawImage != null)
         {
-            // Set the texture of the RawImage to display the processed image
-            rawImage.texture = texture;
+            if (mat != null)
+            {
+                rawImage.texture =
+                    OpenCvSharp.Unity.MatToTexture(mat,
+                        rawImage.texture as Texture2D); // Implement conversion based on your setup
+            }
+
 
             if (resize)
             {
-                if (texture != null)
+                if (rawImage.texture != null)
                 {
                     // Optionally, adjust the size of the RawImage to match the texture dimensions
-                    rawImage.rectTransform.sizeDelta = new Vector2(texture.width, texture.height);
+                    rawImage.rectTransform.sizeDelta = new Vector2(rawImage.texture.width, rawImage.texture.height);
                 }
             }
         }
@@ -712,37 +794,40 @@ public class SudokuImageReader : MonoBehaviour
             outputText.text += "Solve: false\n";
         }
 
-        if (customOCREngine.updateDB)
-        {
-            outputText.text += "customOCREngine.updateDB: true\n";
-        }
-        else
-        {
-            outputText.text += "customOCREngine.updateDB: false\n";
-        }
-
         if (RenderScreenInUpdate)
         {
-            outputText.text += "RenderScreenInUpdate: true\n";
+            outputText.text += "Realtime: true\n";
         }
         else
         {
-            outputText.text += "RenderScreenInUpdate: false\n";
+            outputText.text += "Realtime: false\n";
+        }
+
+        if (recognizeEnabled)
+        {
+            outputText.text += "OCR: true\n";
+        }
+        else
+        {
+            outputText.text += "OCR: false\n";
         }
 
 
-        outputText.text += "Size: " + imageProcessing.gridSize + "\n";
+        outputText.text += "DB: " + numberRecognizer.DBInfo() + "\n";
+
+        if (customOCREngine.updateDB)
+        {
+            outputText.text += "DB EDIT: true\n";
+        }
+        else
+        {
+            outputText.text += "DB EDIT: false\n";
+        }
+
+
+        outputText.text += "Font Size: " + letterOCREffectProfile.resizedWidthAndHeight + "\n";
         outputText.text += "Accuracy: " + numberRecognizer.RecognizeThreshold + "\n";
 
-
-        if (useCamera)
-        {
-            webCameraSudoku.enabled = (true);
-        }
-        else
-        {
-            webCameraSudoku.enabled = (false);
-        }
 
         if (RenderOneFrame)
         {

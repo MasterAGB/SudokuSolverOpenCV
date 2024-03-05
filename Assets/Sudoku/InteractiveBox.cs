@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.EventSystems; // Include this for UI checks
 
 public class InteractiveBox : MonoBehaviour
 {
@@ -16,6 +17,10 @@ public class InteractiveBox : MonoBehaviour
 
     private void Update()
     {
+        // Check if the pointer is over a UI element
+        if (EventSystem.current.IsPointerOverGameObject()) return; // Ignore input over UI
+        if (Input.touchCount > 0 && EventSystem.current.IsPointerOverGameObject(Input.GetTouch(0).fingerId)) return; // Ignore touch input over UI
+
         // PC Input
         if (Input.GetMouseButton(0)) // Left mouse button for rotation
         {
@@ -27,9 +32,9 @@ public class InteractiveBox : MonoBehaviour
         }
         else if (Input.GetMouseButton(1)) // Right mouse button for dragging
         {
-            float dragX = Input.GetAxis("Mouse X") * dragSpeed * Time.deltaTime;
-            float dragY = Input.GetAxis("Mouse Y") * dragSpeed * Time.deltaTime;
-            transform.Translate(-dragX, -dragY, 0, Space.World);
+            float dragX = Input.GetAxis("Mouse X") * dragSpeed;
+            float dragY = Input.GetAxis("Mouse Y") * dragSpeed;
+            transform.Translate(dragX, dragY, 0, Space.World); // Removed Time.deltaTime and changed sign for direct control
         }
 
         // Mouse wheel for zoom
@@ -63,11 +68,11 @@ public class InteractiveBox : MonoBehaviour
             if (Mathf.Abs(deltaMagnitudeDiff) < 1f) // Assuming small pinch movements count as a drag
             {
                 Vector2 avgDeltaPosition = (touchZero.deltaPosition + touchOne.deltaPosition) / 2;
-                transform.Translate(-avgDeltaPosition.x * dragSpeed * Time.deltaTime, -avgDeltaPosition.y * dragSpeed * Time.deltaTime, 0, Space.World);
+                transform.Translate(avgDeltaPosition.x * dragSpeed * Time.deltaTime, avgDeltaPosition.y * dragSpeed * Time.deltaTime, 0, Space.World); // Changed sign for direct control
             }
 
             // Zoom
-            cam.transform.Translate(0, 0, deltaMagnitudeDiff * zoomSpeed * Time.deltaTime, Space.Self);
+            cam.transform.Translate(0, 0, -deltaMagnitudeDiff * zoomSpeed * Time.deltaTime, Space.Self); // Negate to invert zoom direction
         }
     }
 }

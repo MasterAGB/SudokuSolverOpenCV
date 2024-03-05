@@ -1,0 +1,70 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!1 &186047088080523426
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 5293924768511087237}
+  - component: {fileID: 7766960882064148510}
+  m_Layer: 0
+  m_Name: ProfileFrame
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &5293924768511087237
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 186047088080523426}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 675.50073, y: 759.05536, z: -1.2208052}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &7766960882064148510
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 186047088080523426}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: db3af984eae2f3a478ba2c1141693a57, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  useBlur: 1
+  blurSize: 5
+  sigmaX: 0
+  useBilateralFilter: 0
+  d: 5
+  sigmaColor: 75
+  sigmaSpace: 75
+  useAdaptive: 1
+  blockSize: 49
+  C: 47
+  useEdgeDetection: 0
+  cannyThreshold1: 50
+  cannyThreshold2: 150
+  useContrastAdjustments: 1
+  alpha: 1
+  beta: 0
+  useClahe: 1
+  clipLimit: 5
+  tileGridSize: 8
+  useEqualizeHist: 1
+  useMorph: 1
+  morphSize: 1
+  trimFromCenterValue: 3
+  resizedWidthAndHeight: 24
