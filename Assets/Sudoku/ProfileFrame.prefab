@@ -44,27 +44,30 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: db3af984eae2f3a478ba2c1141693a57, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  useBlur: 1
-  blurSize: 5
-  sigmaX: 0
-  useBilateralFilter: 0
-  d: 5
-  sigmaColor: 75
-  sigmaSpace: 75
-  useAdaptive: 1
-  blockSize: 49
-  C: 47
-  useEdgeDetection: 0
-  cannyThreshold1: 50
-  cannyThreshold2: 150
-  useContrastAdjustments: 1
-  alpha: 1
-  beta: 0
   useClahe: 1
-  clipLimit: 5
-  tileGridSize: 8
+  clipLimit: 7.4
+  tileGridSize: 38
+  useBilateralFilter: 0
+  d: 10
+  sigmaColor: 10
+  sigmaSpace: 75
   useEqualizeHist: 1
+  useContrastAdjustments: 1
+  alpha: 3
+  beta: 0
+  useBlur: 1
+  blurSize: 29
+  sigmaX: 0
+  useEdgeDetection: 1
+  cannyThreshold1: 0
+  cannyThreshold2: 73
   useMorph: 1
-  morphSize: 1
+  morphSize: 5
+  morphTypes: 1
+  useAdaptive: 0
+  blockSize: 100
+  C: 63.099998474121094
+  cropBorderPercentage: 0.15
   trimFromCenterValue: 3
   resizedWidthAndHeight: 24
+  minPixelsForEnlarge: 8

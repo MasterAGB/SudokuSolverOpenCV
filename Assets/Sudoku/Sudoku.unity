@@ -1084,7 +1084,7 @@ RectTransform:
   m_AnchorMin: {x: 0, y: 0}
   m_AnchorMax: {x: 0, y: 0}
   m_AnchoredPosition: {x: 9.998291, y: 86.96954}
-  m_SizeDelta: {x: 82.6591, y: 166.0609}
+  m_SizeDelta: {x: 140.152, y: 166.0609}
   m_Pivot: {x: 0, y: 0}
 --- !u!114 &234308343
 MonoBehaviour:
@@ -4331,8 +4331,8 @@ Transform:
   m_GameObject: {fileID: 1079498306}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: -0.99999905, w: 0.001396349}
-  m_LocalPosition: {x: 1.3, y: 0.3, z: 10}
-  m_LocalScale: {x: 5, y: 5, z: 5}
+  m_LocalPosition: {x: 0.44, y: 0.32, z: 10}
+  m_LocalScale: {x: 18.43658, y: 8.744974, z: 5}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 923034537}
@@ -4359,7 +4359,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: d33ff410b6fa63746871d920bfe39c30, type: 2}
+  - {fileID: 2100000, guid: b4980f85dbbdf5c42b24e1f32c653fbc, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -8130,62 +8130,6 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 0}
     m_Modifications:
-    - target: {fileID: 1044865323792270084, guid: 25a9aaf6714c47f4bb45eb45ddb1aaa1, type: 3}
-      propertyPath: C
-      value: 65
-      objectReference: {fileID: 0}
-    - target: {fileID: 1044865323792270084, guid: 25a9aaf6714c47f4bb45eb45ddb1aaa1, type: 3}
-      propertyPath: beta
-      value: 28
-      objectReference: {fileID: 0}
-    - target: {fileID: 1044865323792270084, guid: 25a9aaf6714c47f4bb45eb45ddb1aaa1, type: 3}
-      propertyPath: alpha
-      value: 2.63
-      objectReference: {fileID: 0}
-    - target: {fileID: 1044865323792270084, guid: 25a9aaf6714c47f4bb45eb45ddb1aaa1, type: 3}
-      propertyPath: useBlur
-      value: 1
-      objectReference: {fileID: 0}
-    - target: {fileID: 1044865323792270084, guid: 25a9aaf6714c47f4bb45eb45ddb1aaa1, type: 3}
-      propertyPath: blurSize
-      value: 3
-      objectReference: {fileID: 0}
-    - target: {fileID: 1044865323792270084, guid: 25a9aaf6714c47f4bb45eb45ddb1aaa1, type: 3}
-      propertyPath: useMorph
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 1044865323792270084, guid: 25a9aaf6714c47f4bb45eb45ddb1aaa1, type: 3}
-      propertyPath: blockSize
-      value: 100
-      objectReference: {fileID: 0}
-    - target: {fileID: 1044865323792270084, guid: 25a9aaf6714c47f4bb45eb45ddb1aaa1, type: 3}
-      propertyPath: clipLimit
-      value: 4
-      objectReference: {fileID: 0}
-    - target: {fileID: 1044865323792270084, guid: 25a9aaf6714c47f4bb45eb45ddb1aaa1, type: 3}
-      propertyPath: tileGridSize
-      value: 5
-      objectReference: {fileID: 0}
-    - target: {fileID: 1044865323792270084, guid: 25a9aaf6714c47f4bb45eb45ddb1aaa1, type: 3}
-      propertyPath: cannyThreshold2
-      value: 131
-      objectReference: {fileID: 0}
-    - target: {fileID: 1044865323792270084, guid: 25a9aaf6714c47f4bb45eb45ddb1aaa1, type: 3}
-      propertyPath: useEqualizeHist
-      value: 1
-      objectReference: {fileID: 0}
-    - target: {fileID: 1044865323792270084, guid: 25a9aaf6714c47f4bb45eb45ddb1aaa1, type: 3}
-      propertyPath: trimFromCenterValue
-      value: 3
-      objectReference: {fileID: 0}
-    - target: {fileID: 1044865323792270084, guid: 25a9aaf6714c47f4bb45eb45ddb1aaa1, type: 3}
-      propertyPath: cropBorderPercentage
-      value: 0.09
-      objectReference: {fileID: 0}
-    - target: {fileID: 1044865323792270084, guid: 25a9aaf6714c47f4bb45eb45ddb1aaa1, type: 3}
-      propertyPath: useContrastAdjustments
-      value: 1
-      objectReference: {fileID: 0}
     - target: {fileID: 4634237957090747063, guid: 25a9aaf6714c47f4bb45eb45ddb1aaa1, type: 3}
       propertyPath: m_Name
       value: ProfileOCR
@@ -8286,66 +8230,6 @@ PrefabInstance:
     - target: {fileID: 5293924768511087237, guid: fbaed9628ab95304d9570b7768837ce2, type: 3}
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 7766960882064148510, guid: fbaed9628ab95304d9570b7768837ce2, type: 3}
-      propertyPath: C
-      value: 100
-      objectReference: {fileID: 0}
-    - target: {fileID: 7766960882064148510, guid: fbaed9628ab95304d9570b7768837ce2, type: 3}
-      propertyPath: d
-      value: 1
-      objectReference: {fileID: 0}
-    - target: {fileID: 7766960882064148510, guid: fbaed9628ab95304d9570b7768837ce2, type: 3}
-      propertyPath: beta
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 7766960882064148510, guid: fbaed9628ab95304d9570b7768837ce2, type: 3}
-      propertyPath: alpha
-      value: 1.53
-      objectReference: {fileID: 0}
-    - target: {fileID: 7766960882064148510, guid: fbaed9628ab95304d9570b7768837ce2, type: 3}
-      propertyPath: blurSize
-      value: 7
-      objectReference: {fileID: 0}
-    - target: {fileID: 7766960882064148510, guid: fbaed9628ab95304d9570b7768837ce2, type: 3}
-      propertyPath: useClahe
-      value: 1
-      objectReference: {fileID: 0}
-    - target: {fileID: 7766960882064148510, guid: fbaed9628ab95304d9570b7768837ce2, type: 3}
-      propertyPath: useMorph
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 7766960882064148510, guid: fbaed9628ab95304d9570b7768837ce2, type: 3}
-      propertyPath: blockSize
-      value: 79
-      objectReference: {fileID: 0}
-    - target: {fileID: 7766960882064148510, guid: fbaed9628ab95304d9570b7768837ce2, type: 3}
-      propertyPath: clipLimit
-      value: 10
-      objectReference: {fileID: 0}
-    - target: {fileID: 7766960882064148510, guid: fbaed9628ab95304d9570b7768837ce2, type: 3}
-      propertyPath: sigmaColor
-      value: 10
-      objectReference: {fileID: 0}
-    - target: {fileID: 7766960882064148510, guid: fbaed9628ab95304d9570b7768837ce2, type: 3}
-      propertyPath: tileGridSize
-      value: 16
-      objectReference: {fileID: 0}
-    - target: {fileID: 7766960882064148510, guid: fbaed9628ab95304d9570b7768837ce2, type: 3}
-      propertyPath: cannyThreshold1
-      value: 103
-      objectReference: {fileID: 0}
-    - target: {fileID: 7766960882064148510, guid: fbaed9628ab95304d9570b7768837ce2, type: 3}
-      propertyPath: cannyThreshold2
-      value: 160
-      objectReference: {fileID: 0}
-    - target: {fileID: 7766960882064148510, guid: fbaed9628ab95304d9570b7768837ce2, type: 3}
-      propertyPath: useBilateralFilter
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 7766960882064148510, guid: fbaed9628ab95304d9570b7768837ce2, type: 3}
-      propertyPath: cropBorderPercentage
-      value: 0.15
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []

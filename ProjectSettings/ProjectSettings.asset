@@ -160,7 +160,7 @@ PlayerSettings:
   androidMaxAspectRatio: 2.1
   androidMinAspectRatio: 1
   applicationIdentifier:
-    Android: com.DefaultCompany.SudokuSolver
+    Android: com.lv.sensora.sudoku.SudokuSolver
     Standalone: com.DefaultCompany.OpenCV
   buildNumber:
     Bratwurst: 0

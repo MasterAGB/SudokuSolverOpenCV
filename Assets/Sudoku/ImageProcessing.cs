@@ -5,9 +5,9 @@ using Rect = OpenCvSharp.Rect;
 
 public class ImageProcessing : MonoBehaviour
 {
-    [Header("Blur Settings")] public bool useBlur = true;
-    [Range(0, 100)] public int blurSize = 5;
-    [Range(0, 100)] public double sigmaX = 0;
+    [Header("CLAHE")] public bool useClahe = true;
+    [Range(1, 40)] public float clipLimit = 2.0f;
+    [Range(1, 128)] public int tileGridSize = 8;
 
     [Header("Bilateral Filter")] public bool useBilateralFilter = false;
     [Range(1, 10)] public int d = 5; // Diameter of each pixel neighborhood
@@ -15,26 +15,29 @@ public class ImageProcessing : MonoBehaviour
     [Range(10, 150)] public double sigmaSpace = 75; // Filter sigma in the coordinate space
 
 
-    [Header("Adaptive thresholding")] public bool useAdaptive = true;
-    [Range(0, 100)] public int blockSize = 41;
-    [Range(0, 100)] public double C = 20;
+    [Header("EqualizeHist")] public bool useEqualizeHist = true;
+    [Header("Contrast Adjustment")] public bool useContrastAdjustments = true;
+    [Range(1.0f, 3.0f)] public float alpha = 1.0f; // Contrast control
+    [Range(0.0f, 100.0f)] public float beta = 0; // Brightness control
+
+    [Header("Blur Settings")] public bool useBlur = true;
+    [Range(0, 100)] public int blurSize = 5;
+    [Range(0, 100)] public double sigmaX = 0;
+
 
     [Header("Edge Detection")] public bool useEdgeDetection = false;
     [Range(0, 200)] public double cannyThreshold1 = 50;
     [Range(0, 200)] public double cannyThreshold2 = 150;
 
-    [Header("Contrast Adjustment")] public bool useContrastAdjustments = true;
-    [Range(1.0f, 3.0f)] public float alpha = 1.0f; // Contrast control
-    [Range(0.0f, 100.0f)] public float beta = 0; // Brightness control
-
-    [Header("CLAHE")] public bool useClahe = true;
-    [Range(1, 40)] public float clipLimit = 2.0f;
-    [Range(1, 128)] public int tileGridSize = 8;
-
-    [Header("EqualizeHist")] public bool useEqualizeHist = true;
 
     [Header("Morphological Operations")] public bool useMorph = true;
     [Range(1, 5)] public int morphSize = 1; // Kernel size for morphological operations
+    public MorphTypes morphTypes = MorphTypes.ERODE;
+
+
+    [Header("Adaptive thresholding")] public bool useAdaptive = true;
+    [Range(0, 100)] public int blockSize = 41;
+    [Range(0, 100)] public double C = 20;
 
 
     [Header("Crop and resize settings")] [Range(0, 0.45f)]
@@ -50,19 +53,18 @@ public class ImageProcessing : MonoBehaviour
         Mat originalImageCropped = new Mat();
         originalImageCropped = originalImage.Clone();
 
-       
+
         float removingPixelsX = originalImageCropped.Width * cropBorderPercentage;
         float removingPixelsY = originalImageCropped.Width * cropBorderPercentage;
         originalImageCropped = new Mat(originalImageCropped,
             new Rect((int)removingPixelsX, (int)removingPixelsY,
                 (int)(originalImageCropped.Width - 2 * removingPixelsX),
                 (int)(originalImageCropped.Height - 2 * removingPixelsY)));
-             
 
 
         originalImageCropped = TrimBordersFromCenter(originalImageCropped);
 
-      
+
 /*
         Cv2.CopyMakeBorder(originalImageCropped, originalImageCropped, 20, 20, 20, 20,
             BorderTypes.Constant, new Scalar(0, 0, 0));
@@ -88,116 +90,69 @@ public class ImageProcessing : MonoBehaviour
 
     public Mat PreprocessImage(Mat originalImage)
     {
-        Mat originalImageCropped = new Mat();
-        originalImageCropped = originalImage.Clone();
+        // Clone the original image to keep the source intact
+        Mat gray = originalImage.CvtColor(ColorConversionCodes.BGR2GRAY);
 
-
-        if (blurSize % 2 == 0) blurSize++;
-        if (blockSize % 2 == 0) blockSize++;
-
-        Mat gray = new Mat();
-        Cv2.CvtColor(originalImageCropped, gray, ColorConversionCodes.BGR2GRAY);
-        originalImageCropped.Dispose();
-
-
-        Mat claheImg = new Mat();
         if (useClahe)
         {
-            // Apply CLAHE
+            //Enhances local contrast
             CLAHE clahe = Cv2.CreateCLAHE(clipLimit, new Size(tileGridSize, tileGridSize));
-            clahe.Apply(gray, claheImg);
+            clahe.Apply(gray, gray);
         }
-        else
-        {
-            claheImg = gray.Clone();
-        }
-
-        gray.Dispose();
-
-
-        if (useEqualizeHist)
-        {
-            Cv2.EqualizeHist(claheImg, claheImg);
-        }
-
-
-        Mat contrastAdjusted = new Mat();
-        if (useContrastAdjustments)
-        {
-            // Dynamic contrast and brightness adjustment (optional, depending on results from CLAHE)
-            claheImg.ConvertTo(contrastAdjusted, -1, alpha, beta);
-        }
-        else
-        {
-            contrastAdjusted = claheImg.Clone();
-        }
-
-        claheImg.Dispose();
 
 
         if (useBilateralFilter)
         {
-            Mat bilateralFiltered = new Mat();
-            Cv2.BilateralFilter(contrastAdjusted, bilateralFiltered, d, sigmaColor, sigmaSpace);
-            contrastAdjusted = bilateralFiltered;
+            // Reduce noise while preserving edges
+            gray = gray.BilateralFilter(d, sigmaColor, sigmaSpace);
         }
 
 
-        Mat blurred = new Mat();
+        if (useEqualizeHist)
+        {
+            // Adjust contrast and brightness
+            gray = gray.EqualizeHist();
+        }
+
+        if (useContrastAdjustments)
+        {
+            // Dynamic contrast and brightness adjustment (optional, depending on results from CLAHE)
+            gray.ConvertTo(gray, -1, alpha, beta);
+        }
+
         if (useBlur)
         {
-            // Apply Gaussian Blur to reduce noise
-            Cv2.GaussianBlur(contrastAdjusted, blurred, new Size(blurSize, blurSize), sigmaX);
+            // Smoothens the image to reduce high-frequency noise before thresholding
+            blurSize += blurSize % 2 == 0 ? 1 : 0;
+            gray = gray.GaussianBlur(new Size(blurSize, blurSize), sigmaX);
         }
-        else
-        {
-            blurred = contrastAdjusted.Clone();
-        }
-
-        contrastAdjusted.Dispose();
-
-
-        Mat adaptiveThresh = new Mat();
-        if (useAdaptive)
-        {
-            // Apply adaptive thresholding
-            Cv2.AdaptiveThreshold(blurred, adaptiveThresh, 255, AdaptiveThresholdTypes.GaussianC,
-                ThresholdTypes.BinaryInv, blockSize, C);
-        }
-        else
-        {
-            adaptiveThresh = blurred.Clone();
-        }
-
-        blurred.Dispose();
 
 
         if (useEdgeDetection)
         {
-            Mat edges = new Mat();
-            Cv2.Canny(adaptiveThresh, edges, cannyThreshold1, cannyThreshold2);
-            adaptiveThresh = edges;
+            //Highlights the edges of characters. If you perform edge detection, you might use it for contours and character segmentation, not necessarily followed by thresholding.
+            Cv2.Canny(gray, gray, cannyThreshold1, cannyThreshold2);
         }
 
 
-        Mat morphed = new Mat();
         if (useMorph)
         {
-            // Apply morphological operations to enhance grid lines
+            // Morphological operations to enhance/denoise the image before thresholding
             Mat kernel = Cv2.GetStructuringElement(MorphShapes.Rect, new Size(2 * morphSize + 1, 2 * morphSize + 1),
                 new Point(morphSize, morphSize));
-
-            Cv2.MorphologyEx(adaptiveThresh, morphed, MorphTypes.Close, kernel);
+            gray = gray.MorphologyEx(morphTypes, kernel);
         }
-        else
+
+        if (useAdaptive)
         {
-            morphed = adaptiveThresh.Clone();
+            //Should be done on the grayscale image after all the above steps (except edge detection) to create a clear binary image for OCR.
+            if (blockSize % 2 == 0) blockSize++;
+            // Apply adaptive thresholding
+            Cv2.AdaptiveThreshold(gray, gray, 255, AdaptiveThresholdTypes.GaussianC,
+                ThresholdTypes.BinaryInv, blockSize, C);
         }
 
-        adaptiveThresh.Dispose();
-
-
-        return morphed;
+        return gray;
     }
 
 
@@ -277,7 +232,7 @@ public class ImageProcessing : MonoBehaviour
 
         //Debug.Log("End:"+width+"x"+height+" = "+startX + " " + endX + " " + startY + "+1 " + endY+" +1");
         // Crop the original grayscale image according to the final expanded box
-        Mat croppedCell = new Mat(cell, new Rect(startX, startY, endX - startX +1, endY - startY+1));
+        Mat croppedCell = new Mat(cell, new Rect(startX, startY, endX - startX + 1, endY - startY + 1));
         return croppedCell;
     }
 
@@ -294,13 +249,13 @@ public class ImageProcessing : MonoBehaviour
                 if (startX <= 0) ended = true;
                 break;
             case "right":
-                if (endX >= width-1) ended = true;
+                if (endX >= width - 1) ended = true;
                 break;
             case "up":
                 if (startY <= 0) ended = true;
                 break;
             case "down":
-                if (endY >= height-1) ended = true;
+                if (endY >= height - 1) ended = true;
                 break;
         }
 
@@ -318,23 +273,22 @@ public class ImageProcessing : MonoBehaviour
         switch (direction)
         {
             case "left":
-                
-                whites = CountWhites(cell[new Rect(startX - 1, startY, 1, endY - startY+1)]);
+
+                whites = CountWhites(cell[new Rect(startX - 1, startY, 1, endY - startY + 1)]);
                 //whites = 0;
                 break;
             case "right":
-                whites = CountWhites(cell[new Rect(endX + 1, startY, 1, endY - startY+1)]);
+                whites = CountWhites(cell[new Rect(endX + 1, startY, 1, endY - startY + 1)]);
                 //whites = 0;
                 break;
             case "up":
-                whites = CountWhites(cell[new Rect(startX, startY - 1, endX - startX+1, 1)]);
+                whites = CountWhites(cell[new Rect(startX, startY - 1, endX - startX + 1, 1)]);
                 //whites = 0;
                 break;
             case "down":
-                whites = CountWhites(cell[new Rect(startX, endY + 1, endX - startX+1, 1)]);
+                whites = CountWhites(cell[new Rect(startX, endY + 1, endX - startX + 1, 1)]);
                 //whites = 1;
                 break;
-                
         }
 
         bool expandHasWhitePixels = whites > exp;
@@ -342,15 +296,13 @@ public class ImageProcessing : MonoBehaviour
         {
             //Debug.Log("No white pixels for side "+direction+" Whites:"+whites);
         }
-        
-        return expandHasWhitePixels;
 
+        return expandHasWhitePixels;
     }
 
 
     private float CountWhites(Mat mat)
     {
-        
         int countNonZero = Cv2.CountNonZero(mat);
         //Debug.Log(countNonZero);
 

@@ -109,6 +109,8 @@ public class SudokuImageReader : MonoBehaviour
         customOCREngine.updateDB = !customOCREngine.updateDB;
         if (customOCREngine.updateDB)
         {
+            recognizeEnabled = true;
+            
             //Setting high accuracy
             numberRecognizer.RecognizeThreshold = 0.9f;
             numberRecognizer.VariantThreshold = 0.9f;
